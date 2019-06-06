@@ -13,29 +13,79 @@
 #include <avr/pgmspace.h>
 #include <avr/delay.h>
 #include <stdio.h>
-#include "safe_malloc.h"
-#include "prints.h"
+#include <ctype.h>
+//#include "../safe_malloc.h"
+#include "../prints.h"
+
+namespace cbuffer_constr_method{
+	enum constr_method{
+		with_malloc,
+		by_pointer,
+	};
+}
+
+void print_buff_char(char c);
 
 class CircBuffer{
 private:
 	volatile uint32_t head;
 	volatile uint32_t tail;
-	char buffer_for_string[50];
+	char* buffer_for_string;
+	cbuffer_constr_method::constr_method constr_method;
+	uint8_t local_buff_for_string_size = 50;
 public:
 	volatile uint32_t size;
 	uint8_t* buffer;
 	//MallocSafe <uint8_t> safe_allocated_buffer;
 	volatile uint32_t available;
-	CircBuffer(uint32_t siz): head(0), tail(0), size(siz), available(0) {
+	CircBuffer(uint32_t siz):
+		head(0), tail(0), size(siz), available(0){
+		buffer_for_string = (char*)malloc(local_buff_for_string_size);
 		buffer = (uint8_t*)malloc(size);
+		constr_method = cbuffer_constr_method::with_malloc;
+	}
+	CircBuffer(CircBuffer* cbuffer){
+		head = cbuffer->head;
+		size = cbuffer->size;
+		available = cbuffer->available;
+		buffer_for_string = cbuffer->buffer_for_string;
+		buffer = cbuffer->buffer;
+		constr_method = cbuffer_constr_method::by_pointer;
 	}
 	~CircBuffer(){
-		free(buffer);;
+		switch (constr_method) {
+			case cbuffer_constr_method::with_malloc:
+				free(buffer);
+				break;
+			default:
+				break;
+		}
+
 	}
 	void flush(){
 		head = 0;
 		tail = 0;
 		available = 0;
+	}
+
+	void flush(uint32_t amount){
+		while(amount--)
+			get();
+	}
+
+	CircBuffer peek(){
+		/*
+		 * Return CircBuffer created with pointer constructor
+		 * It makes its own head, tail, available but points to common buffer
+		 * In practice this is just freeze state of real CircBuffer can be used to peek
+		 */
+		return CircBuffer(this);
+	}
+
+	void peek_sync(CircBuffer* peek_cbuffer){
+		peek_cbuffer->available = available;
+		peek_cbuffer->head = head;
+		peek_cbuffer->tail = tail;
 	}
 
 	void put(uint8_t chr){
@@ -126,7 +176,11 @@ public:
 		return ext_buff;
 	}
 	char* gets(char str_end = '\x00'){
-		return gets(buffer_for_string, str_end);
+		gets(buffer_for_string, str_end);
+		for(int i=local_buff_for_string_size-3; i<local_buff_for_string_size; i++)
+			buffer_for_string[i] = '.';
+		buffer_for_string[local_buff_for_string_size] = '\0';
+		return buffer_for_string;
 	}
 
 	void put(uint32_t amount, uint8_t* ext_buffer){
@@ -177,6 +231,23 @@ public:
 		return false;
 	}
 
+	int32_t is_in_buffer(char c){
+		uint8_t* tmp_ptr=buffer+head;
+		//uint32_t position = 0;
+		char _c;
+		for(uint32_t i=0; i<available; i++){
+			_c = *(tmp_ptr+i); //<!!!!! overflow of pointer
+			if(_c == c){
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	void set_head(uint32_t new_head){
+		head = new_head;
+	}
+
 	bool is_in_buffer(char* string){
 		uint32_t _head = head;
 		if(available){
@@ -191,9 +262,11 @@ public:
 		}
 		return false;
 	}
+
+	uint8_t* get_buff_ptr(){
+		return buffer;
+	}
 };
-
-
 
 
 #endif /* CBUFFER_H_ */
