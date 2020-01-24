@@ -15,7 +15,8 @@
 #include <stdio.h>
 #include <ctype.h>
 //#include "../safe_malloc.h"
-#include "../prints.h"
+//#include "../prints.h"
+
 
 namespace cbuffer_constr_method{
 	enum constr_method{
@@ -30,21 +31,20 @@ class CircBuffer{
 private:
 	volatile uint32_t head;
 	volatile uint32_t tail;
-	char* buffer_for_string;
 	cbuffer_constr_method::constr_method constr_method;
-	uint8_t local_buff_for_string_size = 50;
+	uint8_t local_buff_for_string_size;
 public:
-	volatile uint32_t size;
-	uint8_t* buffer;
-	//MallocSafe <uint8_t> safe_allocated_buffer;
+	char* buffer_for_string;
 	volatile uint32_t available;
-	CircBuffer(uint32_t siz):
-		head(0), tail(0), size(siz), available(0){
+	uint8_t* buffer;
+	volatile uint32_t size;
+	CircBuffer(uint32_t siz, uint8_t local_buff_for_string_size=20):
+		head(0), tail(0), local_buff_for_string_size(local_buff_for_string_size), available(0), size(siz){
 		buffer_for_string = (char*)malloc(local_buff_for_string_size);
 		buffer = (uint8_t*)malloc(size);
 		constr_method = cbuffer_constr_method::with_malloc;
 	}
-	CircBuffer(CircBuffer* cbuffer){
+	CircBuffer(CircBuffer* cbuffer, uint8_t local_buff_for_string_size=20): local_buff_for_string_size(local_buff_for_string_size){
 		head = cbuffer->head;
 		size = cbuffer->size;
 		available = cbuffer->available;
@@ -62,6 +62,11 @@ public:
 		}
 
 	}
+
+	uint32_t free_space(){
+		return size - available;
+	}
+
 	void flush(){
 		head = 0;
 		tail = 0;
@@ -126,6 +131,7 @@ public:
 		get(amount, (uint8_t*)ext_buffer);
 	}
 
+
 	//TODO: size of ext_buffer must be known!!
 	char* get_all(char* ext_buffer){
 		uint32_t cnt=0;
@@ -152,6 +158,30 @@ public:
 		return false;
 	}
 
+	char* gets(){
+		/*
+		 * max string len=50
+		 */
+		uint8_t cnt = 0;
+		if(available){
+			_delay_ms(10);
+			//char c;
+			buffer_for_string[cnt] = get();
+			while(buffer_for_string[cnt] != '\r' and buffer_for_string[cnt] != '\n'){
+				if(cnt >= local_buff_for_string_size){
+					break;
+				}
+				cnt++;
+				buffer_for_string[cnt] = get();
+			}
+		}
+		else{
+			buffer_for_string[0] = '\x00';
+		}
+		buffer_for_string[local_buff_for_string_size-1] = '\x00';
+		return buffer_for_string;
+	}
+
 	char* gets(char * ext_buff, char str_end = '\x00'){
 		/*
 		 * max string len=50
@@ -175,11 +205,23 @@ public:
 		}
 		return ext_buff;
 	}
-	char* gets(char str_end = '\x00'){
+
+	char* gets(char str_end){
 		gets(buffer_for_string, str_end);
-		for(int i=local_buff_for_string_size-3; i<local_buff_for_string_size; i++)
-			buffer_for_string[i] = '.';
-		buffer_for_string[local_buff_for_string_size] = '\0';
+		//for(int i=local_buff_for_string_size-3; i<local_buff_for_string_size; i++)
+		//	buffer_for_string[i] = '.';
+		buffer_for_string[local_buff_for_string_size-1] = '\0';
+		return buffer_for_string;
+	}
+
+	char* copy_to_local(){
+	/*
+	 * Gets cbuffer content to buffer_for_string
+	 */
+		for(uint8_t i=0; i<local_buff_for_string_size; i++){
+			buffer_for_string[i] = get();
+		}
+		buffer_for_string[local_buff_for_string_size-1] = '\x00';
 		return buffer_for_string;
 	}
 
@@ -230,6 +272,11 @@ public:
 		}
 		return false;
 	}
+
+	bool is_in_local(const char* string);
+
+	bool is_in_local_p(const char* string);
+
 
 	int32_t is_in_buffer(char c){
 		uint8_t* tmp_ptr=buffer+head;
