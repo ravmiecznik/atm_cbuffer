@@ -23,9 +23,6 @@ namespace cbuffer_constr_method{
 	};
 }
 
-void print_buff_char(char c);
-
-//TODO: move all methods code to *.cpp file, possibly it will save some ram
 
 class CircBuffer{
 private:
