@@ -10,8 +10,6 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include <avr/pgmspace.h>
-#include <avr/delay.h>
 #include <stdio.h>
 #include <ctype.h>
 

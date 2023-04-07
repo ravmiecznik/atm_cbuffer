@@ -7,7 +7,7 @@
 
 #include "cbuffer.h"
 
-#include <iostream>
+
 
 CircBuffer::CircBuffer(uint32_t siz):
 	head(0), tail(0), size(siz){
