@@ -11,7 +11,7 @@
 
 CircBuffer::CircBuffer(uint32_t siz):
 	head(0), tail(0), size(siz){
-	buffer = (uint8_t*)malloc(size);
+	buffer = (uint8_t*)malloc(size+1);
 	constr_method = cbuffer_constr_method::with_malloc;
 }
 
@@ -67,8 +67,8 @@ void CircBuffer::peek_sync(CircBuffer* peek_cbuffer){
 bool CircBuffer::put(uint8_t chr){
 
 	if(free_space()){
-		buffer[tail] = chr;
-		tail = (tail + 1) % size;
+		buffer[tail++] = chr;
+		tail %= (size+1);
 		return true;
 	}
 	else{
@@ -76,11 +76,18 @@ bool CircBuffer::put(uint8_t chr){
 	}
 }
 
+void CircBuffer::pop_last(uint8_t num=1){
+	for(int i=0; i<num; ++i){
+		get();
+	}
+
+}
+
 uint8_t CircBuffer::get(){
 	if(available()){
 		char c;
-		c = buffer[head];
-		head = (head + 1) % size;
+		c = buffer[head++];
+		head %= (size + 1);
 		return c;
 	}
 	else
