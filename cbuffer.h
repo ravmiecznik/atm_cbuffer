@@ -37,6 +37,7 @@ public:
 	CircBuffer(CircBuffer* cbuffer);
 	~CircBuffer();
 	bool put(uint8_t chr);
+	void pop_last(uint8_t num);
 	uint32_t free_space();
 	void flush();
 	void flush(uint32_t amount);
